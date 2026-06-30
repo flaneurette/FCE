@@ -2,7 +2,8 @@
 
 ```
 F /\ B R I K 
-CODE EDITOR
+ CODE 
+EDITOR
 ```
 
 FCE: Fabrik Code Editor (a code editor for all coding languages)
