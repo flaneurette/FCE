@@ -7,7 +7,7 @@
 |    /    \  |    | |\_      |    |  \
 |   /      \_|____|_|  \__ __|__  |   \__
 C ~ O ~ D ~ E       E ~ D ~ I ~ T ~ O ~ R                       
-```
+``` 
 
 FCE: Fabrik Code Editor (a code editor for all coding languages)
 
