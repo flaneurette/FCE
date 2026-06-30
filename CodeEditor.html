@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fabrik Code Editor (FCE)</title>
+<style>
+body {
+    margin: 0;
+    font-family: 'Courier New', monospace;
+    background-color: #ddd;
+    color: #333;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.menubar {
+    background-color: #333;
+    padding: 8px 8px;
+    font-family: Arial;
+    font-size: 12px;
+    border-bottom: 1px solid #666;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    flex-shrink: 0;
+}
+
+.menubar button, .menubar input {
+    padding: 6px 8px;
+    font-family: Arial;
+    font-size: 12px;
+    border: 1px solid #333;
+    border-radius: 3px;
+    background-color: #666;
+    color: #fff;
+    outline: none;
+}
+
+.menubar button:hover {
+    background-color: green;
+    color: #fff;
+}
+
+.menubar button:active {
+    background-color: #d8d8d8;
+}
+
+.tab-bar {
+    background-color: #333;
+    border-bottom: 1px solid #666;
+    display: flex;
+    overflow-x: auto;
+    flex-shrink: 0;
+    font-family: Arial;
+    font-size: 12px;
+    padding-top: 5px;
+}
+
+.tab {
+    padding: 5px 10px;
+    background-color: #fff;
+    border: 1px solid #333;
+    border-bottom: none;
+    border-radius: 5px 5px 0px 0px;
+    margin-right: 2px;
+    cursor: pointer;
+    white-space: nowrap;
+    font-family: Arial;
+    font-size: 12px;
+}
+
+.tab.active {
+    background-color: #f0f0f0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.editor-container {
+    flex-grow: 1;
+    display: flex;
+    overflow: hidden;
+    padding:10px;
+}
+
+.tab-content {
+    display: none;
+    flex-grow: 1;
+    position: relative;
+    overflow: hidden;
+}
+
+.tab-content.active {
+    display: flex;
+}
+
+.line-numbers {
+    background-color: #f5f5f5;
+    border-right: 1px solid #ccc;
+    padding: 15px 15px;
+    text-align: right;
+    color: #666;
+    overflow-y: hidden;  /* changed from auto */
+    font-family: 'Courier New', monospace;
+    white-space: pre;
+    line-height: 1.5;
+    font-size: 13px;
+    flex-shrink: 0;
+}
+
+.code-area {
+    flex-grow: 1;
+    border: none;
+    outline: none;
+    padding: 15px;
+    font-family: 'Courier New', monospace;
+    resize: none;
+    overflow: auto;
+    background-color: white;
+    line-height: 1.5;
+    tab-size: 4;
+    font-size: 13px;
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 100;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.4);
+    font-family: Arial;
+    font-size: 12px;
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 15% auto;
+    padding: 20px;
+    border: 1px solid #666;
+    width: 80%;
+    max-width: 500px;
+    border-radius: 5px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.close:hover {
+    color: black;
+}
+
+.setting-item {
+    margin: 10px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.setting-item label {
+    min-width: 100px;
+}
+
+#save-modal input {
+    width: 100%;
+    padding: 8px;
+    margin: 10px 0;
+    font-family: Arial;
+    font-size: 12px;
+    box-sizing: border-box;
+}
+
+#save-modal button {
+    padding: 8px 15px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: Arial;
+}
+
+#save-modal button:hover {
+    background-color: #45a049;
+}
+
+.search-container {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.search-container input {
+    padding: 6px 6px;
+    font-family: Arial
+    font-size: 13px;
+    width: 150px;
+    border: 1px solid #666;
+    border-radius: 3px;
+    background-color: #333;
+}
+
+.search-container button {
+    padding: 6px 8px;
+    font-family: Arial;
+    font-size: 13px;
+    cursor: pointer;
+    background-color: #333;
+    border: 1px solid #333;
+    border-radius: 3px;
+}
+
+.search-container button:hover {
+    background-color: green;
+}
+
+.search-not-found {
+    color: red;
+    font-size: 12px;
+    font-family: 'Courier New', monospace;
+    margin-left: 4px;
+}
+</style>
+
+</head>
+<body>
+    <div class="menubar">
+        <button id="new-tab-btn" title="New Tab (Ctrl+T)">New Tab</button>
+        <button id="open-btn" title="Open File (Ctrl+O)">Open</button>
+        <button id="save-btn" title="Save File (Ctrl+S)">Save</button>
+        <div class="search-container">
+            <input type="text" id="search-input" placeholder="Search...">
+            <button id="search-btn" title="Search (Enter)">Find</button>
+            <input type="text" id="regexp-search-input" placeholder="Regex...">
+            <button id="regexp-search-btn" title="Regex Search (Enter)">Regex</button>
+            <span class="search-not-found" id="search-status"></span>
+        </div>
+        <button id="settings-btn">Settings</button>
+    </div>
+
+    <div class="tab-bar" id="tab-bar">
+        <div class="tab active" data-tab-id="tab-1">untitled-1.txt</div>
+    </div>
+
+    <div class="editor-container">
+        <div class="tab-content active" data-tab-id="tab-1">
+            <div class="line-numbers" id="line-numbers-1"></div>
+            <textarea class="code-area" id="code-1" spellcheck="false" wrap="off"></textarea>
+        </div>
+    </div>
+
+    <div id="settings-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Settings</h2>
+            <div class="setting-item">
+                <label for="font-size">Font Size:</label>
+                <input type="range" id="font-size" min="10" max="24" value="14">
+                <span id="font-size-value">14px</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="save-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Save File</h2>
+            <input type="text" id="filename-input" placeholder="Enter filename (e.g., myfile.txt)">
+            <button id="confirm-save-btn">Save</button>
+        </div>
+    </div>
+
+<script>
+    
+document.addEventListener('DOMContentLoaded', function() {
+
+    const tabBar = document.getElementById('tab-bar');
+    const editorContainer = document.querySelector('.editor-container');
+    let activeTabId = 'tab-1';
+    let tabCount = 1;
+    let currentSearchIndex = 0;
+    let lastSearchTerm = '';
+
+    // Initialize first tab line numbers
+    updateLineNumbers(activeTabId);
+    syncScroll(document.getElementById('code-1'), document.getElementById('line-numbers-1'));
+
+    // First tab textarea tab key support
+    document.getElementById('code-1').addEventListener('keydown', handleTabKey);
+    document.getElementById('code-1').addEventListener('input', () => updateLineNumbers('tab-1'));
+
+    document.getElementById('new-tab-btn').addEventListener('click', createNewTab);
+
+    document.getElementById('open-btn').addEventListener('click', function() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '*';
+        input.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                getActiveCodeArea().value = e.target.result;
+                updateLineNumbers(activeTabId);
+                updateTabName(file.name);
+            };
+            reader.readAsText(file);
+        });
+        input.click();
+    });
+
+    document.getElementById('save-btn').addEventListener('click', function(e) {
+        e.preventDefault();
+        openSaveModal();
+    });
+
+    function openSaveModal() {
+        const saveModal = document.getElementById('save-modal');
+        const filenameInput = document.getElementById('filename-input');
+        const tabElement = document.querySelector(`.tab[data-tab-id="${activeTabId}"]`);
+        filenameInput.value = tabElement.textContent;
+        saveModal.style.display = 'block';
+        filenameInput.focus();
+        filenameInput.select();
+    }
+
+    document.getElementById('confirm-save-btn').addEventListener('click', function() {
+        doSave();
+    });
+
+    document.getElementById('filename-input').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') doSave();
+    });
+
+    function doSave() {
+        const filenameInput = document.getElementById('filename-input');
+        let filename = filenameInput.value.trim();
+        if (!filename) filename = 'untitled.txt';
+        if (!filename.includes('.')) filename += '.txt';
+
+        const content = getActiveCodeArea().value;
+        const blob = new Blob([content], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        updateTabName(filename);
+        document.getElementById('save-modal').style.display = 'none';
+    }
+
+    const searchInput = document.getElementById('search-input');
+    const regexpInput = document.getElementById('regexp-search-input');
+    const searchStatus = document.getElementById('search-status');
+
+    function doSearch() {
+        const codeArea = getActiveCodeArea();
+        const term = searchInput.value;
+        searchStatus.textContent = '';
+
+        if (!term) return;
+
+        // If term changed, reset index
+        if (term !== lastSearchTerm) {
+            currentSearchIndex = 0;
+            lastSearchTerm = term;
+        }
+
+        let index = codeArea.value.indexOf(term, currentSearchIndex);
+
+        // Wrap around
+        if (index === -1) {
+            index = codeArea.value.indexOf(term, 0);
+        }
+
+        if (index !== -1) {
+            codeArea.focus();
+            codeArea.setSelectionRange(index, index + term.length);
+            // Scroll to selection
+            const linesBefore = codeArea.value.substring(0, index).split('\n').length;
+            codeArea.scrollTop = (linesBefore - 3) * 19.5;
+            currentSearchIndex = index + term.length;
+        } else {
+            searchStatus.textContent = 'Not found';
+        }
+    }
+
+    function syncScroll(codeArea, lineNumbers) {
+        codeArea.addEventListener('scroll', function() {
+            lineNumbers.scrollTop = codeArea.scrollTop;
+        });
+    }
+
+    function doRegexSearch() {
+        const codeArea = getActiveCodeArea();
+        const term = regexpInput.value;
+        searchStatus.textContent = '';
+
+        if (!term) return;
+
+        try {
+            const regex = new RegExp(term, 'g');
+            regex.lastIndex = currentSearchIndex;
+            let match = regex.exec(codeArea.value);
+
+            // Wrap around
+            if (!match) {
+                regex.lastIndex = 0;
+                match = regex.exec(codeArea.value);
+            }
+
+            if (match) {
+                codeArea.focus();
+                codeArea.setSelectionRange(match.index, match.index + match[0].length);
+                const linesBefore = codeArea.value.substring(0, match.index).split('\n').length;
+                codeArea.scrollTop = (linesBefore - 3) * 19.5;
+                currentSearchIndex = match.index + match[0].length;
+            } else {
+                searchStatus.textContent = 'Not found';
+            }
+        } catch (e) {
+            searchStatus.textContent = 'Bad regex';
+        }
+    }
+
+    document.getElementById('search-btn').addEventListener('click', function(e) {
+        e.stopPropagation();
+        doSearch();
+    });
+
+    document.getElementById('regexp-search-btn').addEventListener('click', function(e) {
+        e.stopPropagation();
+        doRegexSearch();
+    });
+
+    searchInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            doSearch();
+        }
+    });
+
+    regexpInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            doRegexSearch();
+        }
+    });
+
+    // Reset search index when search term is cleared
+    searchInput.addEventListener('input', function() {
+        if (!this.value) {
+            currentSearchIndex = 0;
+            lastSearchTerm = '';
+            searchStatus.textContent = '';
+        }
+    });
+
+    regexpInput.addEventListener('input', function() {
+        if (!this.value) {
+            currentSearchIndex = 0;
+            searchStatus.textContent = '';
+        }
+    });
+
+    const settingsModal = document.getElementById('settings-modal');
+    document.getElementById('settings-btn').addEventListener('click', function() {
+        settingsModal.style.display = 'block';
+    });
+
+    settingsModal.querySelector('.close').addEventListener('click', function() {
+        settingsModal.style.display = 'none';
+    });
+
+    // Save modal close button
+    document.getElementById('save-modal').querySelector('.close').addEventListener('click', function() {
+        document.getElementById('save-modal').style.display = 'none';
+    });
+
+    // Click outside modal to close
+    window.addEventListener('click', function(e) {
+        if (e.target === settingsModal) settingsModal.style.display = 'none';
+        if (e.target === document.getElementById('save-modal')) {
+            document.getElementById('save-modal').style.display = 'none';
+        }
+    });
+
+    // Font size
+    document.getElementById('font-size').addEventListener('input', function() {
+        const fontSize = this.value + 'px';
+        document.getElementById('font-size-value').textContent = fontSize;
+        document.querySelectorAll('.code-area, .line-numbers').forEach(el => {
+            el.style.fontSize = fontSize;
+        });
+    });
+
+    document.addEventListener('keydown', function(e) {
+        if (e.ctrlKey) {
+            switch(e.key) {
+                case 'o': e.preventDefault(); document.getElementById('open-btn').click(); break;
+                case 's': e.preventDefault(); openSaveModal(); break;
+                case 'f': e.preventDefault(); searchInput.focus(); searchInput.select(); break;
+                case 't': e.preventDefault(); createNewTab(); break;
+            }
+        }
+    });
+
+    function createNewTab(name = null) {
+        tabCount++;
+        const tabId = `tab-${tabCount}`;
+
+        const tabElement = document.createElement('div');
+        tabElement.className = 'tab';
+        tabElement.textContent = name || `untitled-${tabCount}.txt`;
+        tabElement.dataset.tabId = tabId;
+        tabElement.addEventListener('click', () => switchTab(tabId));
+        tabBar.appendChild(tabElement);
+
+        const tabContent = document.createElement('div');
+        tabContent.className = 'tab-content';
+        tabContent.dataset.tabId = tabId;
+
+        const lineNumbers = document.createElement('div');
+        lineNumbers.className = 'line-numbers';
+        lineNumbers.id = `line-numbers-${tabCount}`;
+
+        const codeArea = document.createElement('textarea');
+        codeArea.className = 'code-area';
+        codeArea.id = `code-${tabCount}`;
+        codeArea.spellcheck = false;
+        codeArea.wrap = 'off';
+        codeArea.addEventListener('input', () => updateLineNumbers(tabId));
+        codeArea.addEventListener('keydown', handleTabKey);
+
+        tabContent.appendChild(lineNumbers);
+        tabContent.appendChild(codeArea);
+        syncScroll(codeArea, lineNumbers);
+        editorContainer.appendChild(tabContent);
+
+        switchTab(tabId);
+        setTimeout(() => codeArea.focus(), 0);
+        
+        updateTabName('Blanco.txt');
+    }
+
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        document.querySelector(`.tab[data-tab-id="${tabId}"]`).classList.add('active');
+        document.querySelector(`.tab-content[data-tab-id="${tabId}"]`).classList.add('active');
+        activeTabId = tabId;
+        currentSearchIndex = 0;
+        lastSearchTerm = '';
+        searchStatus.textContent = '';
+        updateLineNumbers(tabId);
+    }
+
+    function updateLineNumbers(tabId) {
+        const tabNum = tabId.split('-')[1];
+        const codeArea = document.getElementById(`code-${tabNum}`);
+        const lineNumbers = document.getElementById(`line-numbers-${tabNum}`);
+        if (!codeArea || !lineNumbers) return;
+        const lines = codeArea.value.split('\n').length;
+        let text = '';
+        for (let i = 1; i <= lines; i++) text += i + '\n';
+        lineNumbers.textContent = text;
+    }
+
+    function updateTabName(name) {
+        document.querySelector(`.tab[data-tab-id="${activeTabId}"]`).textContent = name;
+    }
+
+    function getActiveCodeArea() {
+        const tabNum = activeTabId.split('-')[1];
+        return document.getElementById(`code-${tabNum}`);
+    }
+
+    function handleTabKey(e) {
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            const start = this.selectionStart;
+            const end = this.selectionEnd;
+            this.value = this.value.substring(0, start) + '    ' + this.value.substring(end);
+            this.selectionStart = this.selectionEnd = start + 4;
+            updateLineNumbers(activeTabId);
+        }
+    }
+
+});
+</script>
+
+</body>
+</html>
