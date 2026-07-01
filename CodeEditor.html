@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Fabrik Code Editor (FCE)</title>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <style>
 body {
     margin: 0;
@@ -62,7 +65,7 @@ body {
 .tab {
     padding: 5px 10px;
     background-color: #fff;
-    border: 1px solid #333;
+    border: 3px outset #eee;
     border-bottom: none;
     border-radius: 5px 5px 0px 0px;
     margin-right: 2px;
@@ -70,11 +73,16 @@ body {
     white-space: nowrap;
     font-family: Arial;
     font-size: 12px;
+    border-left: 2px outset #eee;
+    border-top: 2px outset #eee;
+    border-right: 2px outset #eee;
 }
 
 .tab.active {
     background-color: #f0f0f0;
-    border-bottom: 1px solid #f0f0f0;
+    border-left: 2px outset #eee;
+    border-top: 2px outset #eee;
+    border-right: 2px outset #eee;
 }
 
 .editor-container {
@@ -121,6 +129,7 @@ body {
     line-height: 1.5;
     tab-size: 4;
     font-size: 13px;
+    border: 2px inset #eee;
 }
 
 .modal {
@@ -270,15 +279,6 @@ body {
         </div>
     </div>
 
-    <div id="save-modal" class="modal">
-        <div class="modal-content">
-            <span class="close">&times;</span>
-            <h2>Save File</h2>
-            <input type="text" id="filename-input" placeholder="Enter filename (e.g., myfile.txt)">
-            <button id="confirm-save-btn">Save</button>
-        </div>
-    </div>
-
 <script>
     
 document.addEventListener('DOMContentLoaded', function() {
@@ -323,46 +323,63 @@ document.addEventListener('DOMContentLoaded', function() {
 
     document.getElementById('save-btn').addEventListener('click', function(e) {
         e.preventDefault();
-        openSaveModal();
-    });
-
-    function openSaveModal() {
-        const saveModal = document.getElementById('save-modal');
-        const filenameInput = document.getElementById('filename-input');
-        const tabElement = document.querySelector(`.tab[data-tab-id="${activeTabId}"]`);
-        filenameInput.value = tabElement.textContent;
-        saveModal.style.display = 'block';
-        filenameInput.focus();
-        filenameInput.select();
-    }
-
-    document.getElementById('confirm-save-btn').addEventListener('click', function() {
         doSave();
     });
 
-    document.getElementById('filename-input').addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') doSave();
-    });
-
-    function doSave() {
-        const filenameInput = document.getElementById('filename-input');
-        let filename = filenameInput.value.trim();
-        if (!filename) filename = 'untitled.txt';
-        if (!filename.includes('.')) filename += '.txt';
-
+    async function doSave() {
         const content = getActiveCodeArea().value;
-        const blob = new Blob([content], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        let filename = null;
+        let currentFileHandle = null;
+        const filenameInput = document.querySelector(`.tab[data-tab-id="${activeTabId}"]`).textContent;
+        let filename1 = filenameInput.trim();
+        let filename2 = filenameInput.trim();
+        if (!filename1) filename1 = 'untitled.txt';
+        if (!filename1.includes('.')) filename1 += '.txt';
 
-        updateTabName(filename);
-        document.getElementById('save-modal').style.display = 'none';
+        if(filename2) { 
+            filename = filename1;
+            } else {
+            filename = prompt("Save as:", currentFileHandle?.name || filename1) || "untitled.txt";
+        }
+
+        try {
+            // If we already have a file handle (re-saving), skip the picker
+            if (currentFileHandle && 'showSaveFilePicker' in window) {
+                const writable = await currentFileHandle.createWritable();
+                await writable.write(content);
+                await writable.close();
+            }
+            // First save or fallback to picker
+            else {
+                if ('showSaveFilePicker' in window) {
+                    // @ts-ignore - Modern browsers
+                    currentFileHandle = await window.showSaveFilePicker({
+                        suggestedName: filename,
+                    });
+
+                    const writable = await currentFileHandle.createWritable();
+                    await writable.write(content);
+                    await writable.close();
+                } else {
+                    // Firefox/Safari fallback (still triggers OS dialog, but no extra questions)
+                    const blob = new Blob([content], { type: 'text/plain' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                }
+            }
+            updateTabName(filename);
+        } catch (err) {
+            if (err.name !== 'AbortError') {
+                console.error("Save failed:", err);
+                currentFileHandle = null; // Reset if save fails
+            }
+        }
     }
 
     const searchInput = document.getElementById('search-input');
@@ -488,17 +505,9 @@ document.addEventListener('DOMContentLoaded', function() {
         settingsModal.style.display = 'none';
     });
 
-    // Save modal close button
-    document.getElementById('save-modal').querySelector('.close').addEventListener('click', function() {
-        document.getElementById('save-modal').style.display = 'none';
-    });
-
     // Click outside modal to close
     window.addEventListener('click', function(e) {
         if (e.target === settingsModal) settingsModal.style.display = 'none';
-        if (e.target === document.getElementById('save-modal')) {
-            document.getElementById('save-modal').style.display = 'none';
-        }
     });
 
     // Font size
@@ -514,7 +523,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (e.ctrlKey) {
             switch(e.key) {
                 case 'o': e.preventDefault(); document.getElementById('open-btn').click(); break;
-                case 's': e.preventDefault(); openSaveModal(); break;
+                case 's': e.preventDefault(); doSave(); break;
                 case 'f': e.preventDefault(); searchInput.focus(); searchInput.select(); break;
                 case 't': e.preventDefault(); createNewTab(); break;
             }
