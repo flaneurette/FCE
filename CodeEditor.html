@@ -285,10 +285,11 @@ body {
 
 #splitter {
     width:15px;
-    background-color: #999;
+    background-color: #dbdbdb;
     border-radius: 5px;
     margin:5px;
     cursor: col-resize;
+    display: none;
 }
 
 .context-menu {
@@ -392,7 +393,7 @@ body {
         </div>
         </div>
         <div id="splitter"></div>
-        <iframe id="preview-frame" sandbox="allow-scripts allow-same-origin" style=" width: 100%; height: 100%; border: 0px solid #ccc;" srcdoc="<!DOCTYPE html><html><body></body></html>"></iframe>
+        <iframe id="preview-frame" sandbox="allow-scripts allow-same-origin" style=" width: 0%; height: 100%; border: 0px solid #ccc;" srcdoc="<!DOCTYPE html><html><body></body></html>"></iframe>
     </div>
 
     <div id="settings-modal" class="modal">
@@ -755,6 +756,8 @@ document.addEventListener('DOMContentLoaded', function() {
     function previewCode() {
         const codeArea = getActiveCodeArea();
         updatePreview(codeArea.value);
+        document.getElementById('preview-frame').style.width = '100%';
+        document.getElementById('splitter').style.display = 'block';
     }
 
     function updatePreview(code) {
