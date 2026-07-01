@@ -89,6 +89,7 @@ body {
     display: flex;
     overflow: hidden;
     padding:10px;
+    width: 100%;
 }
 
 .tab-content {
@@ -96,10 +97,12 @@ body {
     flex-grow: 1;
     position: relative;
     overflow: hidden;
+    width:100%;
 }
 
 .tab-content.active {
     display: flex;
+    width:100%;
 }
 
 .line-numbers {
@@ -108,7 +111,7 @@ body {
     padding: 15px 15px;
     text-align: right;
     color: #666;
-    overflow-y: hidden;  /* changed from auto */
+    overflow-y: hidden;
     font-family: 'Courier New', monospace;
     white-space: pre;
     line-height: 1.5;
@@ -250,6 +253,31 @@ body {
     border-radius: 3px;
 }
 
+#preview-btn {
+    padding: 0px;
+    font-family: Arial;
+    font-size: 21px;
+    cursor: pointer;
+    color: #fff;
+    background-color: #ddd;
+    border: 0px solid #ddd;
+    border-radius: 0px;
+    margin-top: -3px;
+    display:none;
+}
+
+#preview-btn:hover {
+    background-color: #ddd;
+}
+
+#splitter {
+    width:15px;
+    background-color: #999;
+    border-radius: 5px;
+    margin:5px;
+    cursor: col-resize;
+}
+
 </style>
 
 </head>
@@ -266,6 +294,7 @@ body {
             <span class="search-not-found" id="search-status"></span>
         </div>
         <button id="settings-btn">Settings</button>
+        <button id="preview-btn" title="Preview html/javascript">&#9654;&#65039;</button>
     </div>
 
     <div class="tab-bar" id="tab-bar">
@@ -277,6 +306,8 @@ body {
             <div class="line-numbers" id="line-numbers-1"></div>
             <textarea class="code-area" id="code-1" spellcheck="false" wrap="off"></textarea>
         </div>
+        <div id="splitter"></div>
+        <iframe id="preview-frame" sandbox="allow-scripts allow-same-origin" style="width: 100%; height: 100%; border: 0px solid #ccc;" srcdoc="<!DOCTYPE html><html><body></body></html>"></iframe>
     </div>
 
     <div id="settings-modal" class="modal">
@@ -315,7 +346,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('code-1').addEventListener('keydown', handleTabKey);
     document.getElementById('code-1').addEventListener('keyup', handleKey);
     document.getElementById('code-1').addEventListener('input', () => updateLineNumbers('tab-1'));
-
+    document.getElementById('splitter').addEventListener('mousedown', splitterMove);
     document.getElementById('new-tab-btn').addEventListener('click', createNewTab);
 
     document.getElementById('open-btn').addEventListener('click', function() {
@@ -330,6 +361,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 getActiveCodeArea().value = e.target.result;
                 updateLineNumbers(activeTabId);
                 updateTabName(file.name);
+                let ext = file.name.split('.');
+                assignPreview(ext[1]);
             };
             reader.readAsText(file);
         });
@@ -340,6 +373,31 @@ document.addEventListener('DOMContentLoaded', function() {
         e.preventDefault();
         doSave();
     });
+
+
+    let isDragging = false;
+    let windowWidth = 0;
+
+    function splitterDown(e) {
+        isDragging = true;
+        e.preventDefault();
+    }
+
+    function splitterMove(e) {
+        if(windowWidth == 0) {
+            windowWidth += window.innerWidth;
+        }
+        windowWidth += 400;
+        document.getElementById('preview-frame').style.width = windowWidth + 'px';
+    }
+
+    function splitterUp() {
+        isDragging = false;
+    }
+
+    // Add event listeners
+    document.getElementById('splitter').addEventListener('mousedown', splitterDown);
+    document.addEventListener('mouseup', splitterUp);
 
     async function doSave() {
         const content = getActiveCodeArea().value;
@@ -389,6 +447,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
             updateTabName(filename);
+            let ext = filename.split('.');
+            assignPreview(ext[1]);
         } catch (err) {
             if (err.name !== 'AbortError') {
                 console.error("Save failed:", err);
@@ -439,6 +499,39 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    function assignPreview(filetype) {
+        if (['html', 'htm', 'thtml', 'xhtml', 'shtml', 'txt', 'md', 'markdown'].includes(filetype.toLowerCase())) {
+            let previewBtn = document.getElementById('preview-btn');
+            previewBtn.style.display = 'block';
+            previewBtn.addEventListener('click', () => { previewCode(filetype); });
+        }
+        return;
+    }
+
+    function previewCode() {
+        const codeArea = getActiveCodeArea();
+        updatePreview(codeArea.value);
+    }
+    
+    function updatePreview(code) {
+        const previewFrame = document.getElementById('preview-frame');
+
+        // Using srcdoc is safer and doesn't require onload
+        previewFrame.srcdoc = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <base target="_blank">
+                <style>
+                    body { margin: 0; padding: 10px; font-family: Arial; }
+                    pre { white-space: pre-wrap; word-wrap: break-word; }
+                </style>
+            </head>
+            <body>${code}</body>
+            </html>
+        `;
+    }
+    
     function doRegexSearch() {
         const codeArea = getActiveCodeArea();
         const term = regexpInput.value;
