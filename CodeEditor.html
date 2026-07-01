@@ -367,7 +367,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // First save or fallback to picker
             else {
                 if ('showSaveFilePicker' in window) {
-                    // @ts-ignore - Modern browsers
+
                     currentFileHandle = await window.showSaveFilePicker({
                         suggestedName: filename,
                     });
@@ -663,3 +663,4 @@ document.addEventListener('DOMContentLoaded', function() {
 
 </body>
 </html>
+
