@@ -92,6 +92,14 @@ body {
     width: 100%;
 }
 
+#tabs {
+    flex-grow: 1;
+    display: flex;
+    overflow: hidden;
+    padding:0px;
+    width: 100%;
+}
+
 .tab-content {
     display: none;
     flex-grow: 1;
@@ -302,12 +310,14 @@ body {
     </div>
 
     <div class="editor-container">
+        <div id="tabs">
         <div class="tab-content active" data-tab-id="tab-1">
             <div class="line-numbers" id="line-numbers-1"></div>
             <textarea class="code-area" id="code-1" spellcheck="false" wrap="off"></textarea>
         </div>
+        </div>
         <div id="splitter"></div>
-        <iframe id="preview-frame" sandbox="allow-scripts allow-same-origin" style="width: 100%; height: 100%; border: 0px solid #ccc;" srcdoc="<!DOCTYPE html><html><body></body></html>"></iframe>
+        <iframe id="preview-frame" sandbox="allow-scripts allow-same-origin" style=" width: 100%; height: 100%; border: 0px solid #ccc;" srcdoc="<!DOCTYPE html><html><body></body></html>"></iframe>
     </div>
 
     <div id="settings-modal" class="modal">
@@ -515,21 +525,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function updatePreview(code) {
         const previewFrame = document.getElementById('preview-frame');
-
-        // Using srcdoc is safer and doesn't require onload
-        previewFrame.srcdoc = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <base target="_blank">
-                <style>
-                    body { margin: 0; padding: 10px; font-family: Arial; }
-                    pre { white-space: pre-wrap; word-wrap: break-word; }
-                </style>
-            </head>
-            <body>${code}</body>
-            </html>
-        `;
+        previewFrame.srcdoc = `${code}`;
     }
     
     function doRegexSearch() {
@@ -644,7 +640,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         tabCount++;
         const tabId = `tab-${tabCount}`;
-
+        let tabs = document.getElementById(`tabs`);
         const tabElement = document.createElement('div');
         tabElement.className = 'tab';
         tabElement.textContent = name || `untitled-${tabCount}.txt`;
@@ -671,7 +667,7 @@ document.addEventListener('DOMContentLoaded', function() {
         tabContent.appendChild(lineNumbers);
         tabContent.appendChild(codeArea);
         syncScroll(codeArea, lineNumbers);
-        editorContainer.appendChild(tabContent);
+        tabs.appendChild(tabContent);
 
         switchTab(tabId);
         setTimeout(() => codeArea.focus(), 0);
