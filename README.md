@@ -9,6 +9,8 @@
 C ~ O ~ D ~ E       E ~ D ~ I ~ T ~ O ~ R                       
 ``` 
 
+<img src="selection_1782897491151.png" />
+
 FCE: Fabrik Code Editor (a code editor for all coding languages)
 
 A minimal html/javascript style code editor, works everywhere, with every language.
