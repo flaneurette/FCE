@@ -336,6 +336,30 @@ body {
     background-color: #45a049;
 }
 
+.new-file-modal input {
+    width: 100%;
+    padding: 8px;
+    margin: 10px 0;
+    font-family: Arial;
+    font-size: 12px;
+    box-sizing: border-box;
+}
+
+.new-file-modal button {
+    padding: 8px 15px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: Arial;
+    margin-right: 10px;
+}
+
+.new-file-modal button:hover {
+    background-color: #45a049;
+}
+
 </style>
 
 </head>
@@ -397,6 +421,20 @@ body {
         </div>
     </div>
 
+    <div id="new-file-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>New File</h2>
+            <div class="new-file-modal">
+                <input type="text" id="file-name-input" placeholder="Enter filename (e.g., myfile.html)">
+                <div>
+                    <button id="confirm-new-file">Create</button>
+                    <button id="cancel-new-file">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="context-menu" class="context-menu">
         <div id="rename-tab">Rename</div>
     </div>
@@ -429,7 +467,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('splitter').addEventListener('mousedown', splitterMove);
 
     // Menu buttons
-    document.getElementById('new-tab-btn').addEventListener('click', createNewTab);
+    document.getElementById('new-tab-btn').addEventListener('click', showNewFileModal);
     document.getElementById('open-btn').addEventListener('click', openFile);
     document.getElementById('save-btn').addEventListener('click', doSave);
     document.getElementById('rename-btn').addEventListener('click', showRenameModal);
@@ -437,6 +475,10 @@ document.addEventListener('DOMContentLoaded', function() {
     // Rename modal buttons
     document.getElementById('confirm-rename').addEventListener('click', renameFile);
     document.getElementById('cancel-rename').addEventListener('click', hideRenameModal);
+
+    // New file modal buttons
+    document.getElementById('confirm-new-file').addEventListener('click', createNewFile);
+    document.getElementById('cancel-new-file').addEventListener('click', hideNewFileModal);
 
     // Context menu for tabs
     document.getElementById('rename-tab').addEventListener('click', showRenameModal);
@@ -559,6 +601,73 @@ document.addEventListener('DOMContentLoaded', function() {
 
         let ext = newName.split('.');
         assignPreview(ext[ext.length - 1]);
+    }
+
+    // New file functionality
+    function showNewFileModal() {
+        document.getElementById('file-name-input').value = '';
+        document.getElementById('new-file-modal').style.display = 'block';
+        document.getElementById('file-name-input').focus();
+    }
+
+    function hideNewFileModal() {
+        document.getElementById('new-file-modal').style.display = 'none';
+    }
+
+    function createNewFile() {
+        let filename = document.getElementById('file-name-input').value.trim();
+        if (!filename) {
+            alert('Please enter a filename');
+            return;
+        }
+
+        // Validate filename
+        if (!filename.includes('.')) {
+            filename += '.txt';
+        }
+
+        hideNewFileModal();
+        createNewTab(filename);
+    }
+
+    function createNewTab(name) {
+        tabFocus[activeTabId] = false;
+
+        tabCount++;
+        const tabId = `tab-${tabCount}`;
+        let tabs = document.getElementById(`tabs`);
+        const tabElement = document.createElement('div');
+        tabElement.className = 'tab';
+        tabElement.textContent = name;
+        tabElement.dataset.tabId = tabId;
+        tabElement.addEventListener('click', () => switchTab(tabId));
+        tabBar.appendChild(tabElement);
+
+        const tabContent = document.createElement('div');
+        tabContent.className = 'tab-content';
+        tabContent.dataset.tabId = tabId;
+
+        const lineNumbers = document.createElement('div');
+        lineNumbers.className = 'line-numbers';
+        lineNumbers.id = `line-numbers-${tabCount}`;
+
+        const codeArea = document.createElement('textarea');
+        codeArea.className = 'code-area';
+        codeArea.id = `code-${tabCount}`;
+        codeArea.spellcheck = false;
+        codeArea.wrap = 'off';
+        codeArea.addEventListener('input', () => updateLineNumbers(tabId));
+        codeArea.addEventListener('keydown', handleTabKey);
+        codeArea.addEventListener('keyup', handleKey);
+        tabContent.appendChild(lineNumbers);
+        tabContent.appendChild(codeArea);
+        syncScroll(codeArea, lineNumbers);
+        tabs.appendChild(tabContent);
+
+        switchTab(tabId);
+        setTimeout(() => codeArea.focus(), 0);
+
+        tabFocus[tabId] = true;
     }
 
     // Context menu for tabs
@@ -722,6 +831,7 @@ document.addEventListener('DOMContentLoaded', function() {
     window.addEventListener('click', function(e) {
         if (e.target === settingsModal) settingsModal.style.display = 'none';
         if (e.target === document.getElementById('rename-modal')) hideRenameModal();
+        if (e.target === document.getElementById('new-file-modal')) hideNewFileModal();
     });
 
     // Font size
@@ -740,53 +850,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 case 'o': e.preventDefault(); document.getElementById('open-btn').click(); break;
                 case 's': e.preventDefault(); doSave(); break;
                 case 'f': e.preventDefault(); searchInput.focus(); searchInput.select(); break;
-                case 't': e.preventDefault(); createNewTab(); break;
+                case 't': e.preventDefault(); showNewFileModal(); break;
                 case 'r': e.preventDefault(); showRenameModal(); break;
             }
         }
     });
-
-    // Tab management
-    function createNewTab(name = null) {
-        tabFocus[activeTabId] = false;
-
-        tabCount++;
-        const tabId = `tab-${tabCount}`;
-        let tabs = document.getElementById(`tabs`);
-        const tabElement = document.createElement('div');
-        tabElement.className = 'tab';
-        tabElement.textContent = name || `untitled-${tabCount}.txt`;
-        tabElement.dataset.tabId = tabId;
-        tabElement.addEventListener('click', () => switchTab(tabId));
-        tabBar.appendChild(tabElement);
-
-        const tabContent = document.createElement('div');
-        tabContent.className = 'tab-content';
-        tabContent.dataset.tabId = tabId;
-
-        const lineNumbers = document.createElement('div');
-        lineNumbers.className = 'line-numbers';
-        lineNumbers.id = `line-numbers-${tabCount}`;
-
-        const codeArea = document.createElement('textarea');
-        codeArea.className = 'code-area';
-        codeArea.id = `code-${tabCount}`;
-        codeArea.spellcheck = false;
-        codeArea.wrap = 'off';
-        codeArea.addEventListener('input', () => updateLineNumbers(tabId));
-        codeArea.addEventListener('keydown', handleTabKey);
-        codeArea.addEventListener('keyup', handleKey);
-        tabContent.appendChild(lineNumbers);
-        tabContent.appendChild(codeArea);
-        syncScroll(codeArea, lineNumbers);
-        tabs.appendChild(tabContent);
-
-        switchTab(tabId);
-        setTimeout(() => codeArea.focus(), 0);
-
-        updateTabName('Blanco.txt');
-        tabFocus[tabId] = true;
-    }
 
     function switchTab(tabId) {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
