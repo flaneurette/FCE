@@ -15,4 +15,16 @@ FCE: Fabrik Code Editor (a code editor for all coding languages)
 
 A minimal html/javascript style code editor, works everywhere, with every language.
 
+### Features
+
+- Open code files
+- Saving of code files
+- Regular string search
+- Regular expression search.
+- Linenumbers
+- Settings
+- Preview screen for html/css (play button)
+
+There is no code highlighting, and this is intended. There will be none.
+
 
