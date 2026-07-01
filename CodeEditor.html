@@ -504,6 +504,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 // Store the file path for files opened via file input
                 filePaths[activeTabId] = file.name;
+                let ext = file.name.split('.');
+                assignPreview(ext[1]);
                 // Don't store regular File objects in fileHandles
             };
             reader.readAsText(file);
@@ -571,7 +573,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             updateTabName(filename);
             let ext = filename.split('.');
-            assignPreview(ext[ext.length - 1]);
+            assignPreview(ext[1]);
         } catch (err) {
             if (err.name !== 'AbortError') {
                 console.error("Save failed:", err);
@@ -610,7 +612,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         let ext = newName.split('.');
-        assignPreview(ext[ext.length - 1]);
+        assignPreview(ext[1]);
     }
 
     // New file functionality
@@ -638,6 +640,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
         hideNewFileModal();
         createNewTab(filename);
+        let ext = filename.split('.');
+        assignPreview(ext[1]);
     }
 
     function createNewTab(name) {
