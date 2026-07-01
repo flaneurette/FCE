@@ -289,6 +289,8 @@ document.addEventListener('DOMContentLoaded', function() {
     let tabCount = 1;
     let currentSearchIndex = 0;
     let lastSearchTerm = '';
+    let cursorPositions = [];
+    let tabFocus = [];
 
     // Initialize first tab line numbers
     updateLineNumbers(activeTabId);
@@ -296,6 +298,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // First tab textarea tab key support
     document.getElementById('code-1').addEventListener('keydown', handleTabKey);
+    document.getElementById('code-1').addEventListener('keyup', handleKey);
     document.getElementById('code-1').addEventListener('input', () => updateLineNumbers('tab-1'));
 
     document.getElementById('new-tab-btn').addEventListener('click', createNewTab);
@@ -519,6 +522,9 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     function createNewTab(name = null) {
+
+        tabFocus[activeTabId] = false;
+
         tabCount++;
         const tabId = `tab-${tabCount}`;
 
@@ -544,7 +550,7 @@ document.addEventListener('DOMContentLoaded', function() {
         codeArea.wrap = 'off';
         codeArea.addEventListener('input', () => updateLineNumbers(tabId));
         codeArea.addEventListener('keydown', handleTabKey);
-
+        codeArea.addEventListener('keyup', handleKey);
         tabContent.appendChild(lineNumbers);
         tabContent.appendChild(codeArea);
         syncScroll(codeArea, lineNumbers);
@@ -554,6 +560,7 @@ document.addEventListener('DOMContentLoaded', function() {
         setTimeout(() => codeArea.focus(), 0);
         
         updateTabName('Blanco.txt');
+        tabFocus[tabId] = true;
     }
 
     function switchTab(tabId) {
@@ -566,6 +573,11 @@ document.addEventListener('DOMContentLoaded', function() {
         lastSearchTerm = '';
         searchStatus.textContent = '';
         updateLineNumbers(tabId);
+        tabFocus[activeTabId] = true;
+        setTimeout(() => {
+            restoreTabCursor(activeTabId);
+            getActiveCodeArea().focus();
+        }, 10);
     }
 
     function updateLineNumbers(tabId) {
@@ -597,6 +609,29 @@ document.addEventListener('DOMContentLoaded', function() {
             this.selectionStart = this.selectionEnd = start + 4;
             updateLineNumbers(activeTabId);
         }
+    }
+
+    function restoreTabCursor() {
+        updateLineNumbers(activeTabId);
+        // Later, restore the cursor position:
+        let textarea = getActiveCodeArea();
+        if(tabFocus[activeTabId] == true) { 
+            textarea.setSelectionRange(cursorPositions[activeTabId], cursorPositions[activeTabId]);
+            tabFocus[activeTabId] = false;
+        }
+    }
+
+    function storeTabCursor() {
+        let textarea = getActiveCodeArea();
+        const cursorPos = textarea.selectionStart;
+        const textBeforeCursor = textarea.value.substring(0, cursorPos);
+        const lineNumber = textBeforeCursor.split('\n').length;
+        // Store the character position (not line number) for the active tab
+        cursorPositions[activeTabId] = cursorPos; // Store the actual position
+    }
+
+    function handleKey(e) {
+        storeTabCursor();
     }
 
 });
