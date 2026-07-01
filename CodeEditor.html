@@ -449,9 +449,10 @@ document.addEventListener('DOMContentLoaded', function() {
     let tabCount = 1;
     let currentSearchIndex = 0;
     let lastSearchTerm = '';
-    let cursorPositions = [];
-    let fileHandles = {}; // Track file handles per tab
-    let tabFocus = [];
+    let cursorPositions = {};
+    let fileHandles = {}; // Track file handles per tab (FileSystemFileHandle objects)
+    let filePaths = {}; // Track original file paths for files opened via file input
+    let tabFocus = {};
 
     // Initialize first tab
     document.querySelector('.tab[data-tab-id="tab-1"]').addEventListener('click', () => switchTab('tab-1'));
@@ -501,13 +502,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 updateLineNumbers(activeTabId);
                 updateTabName(file.name);
 
-                // Store the file handle if supported
-                if ('showSaveFilePicker' in window) {
-                    fileHandles[activeTabId] = file;
-                }
-
-                let ext = file.name.split('.');
-                assignPreview(ext[1]);
+                // Store the file path for files opened via file input
+                filePaths[activeTabId] = file.name;
+                // Don't store regular File objects in fileHandles
             };
             reader.readAsText(file);
         });
@@ -517,36 +514,50 @@ document.addEventListener('DOMContentLoaded', function() {
     // Enhanced save function
     async function doSave() {
         const content = getActiveCodeArea().value;
-        let filename = document.querySelector(`.tab[data-tab-id="${activeTabId}"]`).textContent;
-        let currentFileHandle = fileHandles[activeTabId];
+        const currentTabName = document.querySelector(`.tab[data-tab-id="${activeTabId}"]`).textContent;
+        const fileHandle = fileHandles[activeTabId];
 
         // Ensure filename has extension
+        let filename = currentTabName;
         if (!filename.includes('.')) {
             filename += '.txt';
         }
 
         try {
-            // If we already have a file handle (re-saving), skip the picker
-            if (currentFileHandle && 'showSaveFilePicker' in window) {
-                const writable = await currentFileHandle.createWritable();
+            // Case 1: File was opened via showSaveFilePicker (has createWritable)
+            if (fileHandle && 'createWritable' in fileHandle) {
+                const writable = await fileHandle.createWritable();
                 await writable.write(content);
                 await writable.close();
             }
-            // First save or fallback to picker
+            // Case 2: File was opened via file input (has stored path)
+            else if (filePaths[activeTabId]) {
+                // Fall back to download for files opened via file input
+                const blob = new Blob([content], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+            // Case 3: New file (no existing handle or path)
             else {
                 if ('showSaveFilePicker' in window) {
-                    currentFileHandle = await window.showSaveFilePicker({
+                    const newFileHandle = await window.showSaveFilePicker({
                         suggestedName: filename,
                     });
 
-                    const writable = await currentFileHandle.createWritable();
+                    const writable = await newFileHandle.createWritable();
                     await writable.write(content);
                     await writable.close();
 
-                    // Store the file handle
-                    fileHandles[activeTabId] = currentFileHandle;
+                    // Store the new file handle
+                    fileHandles[activeTabId] = newFileHandle;
                 } else {
-                    // Firefox/Safari fallback
+                    // Fallback for browsers without File System Access API
                     const blob = new Blob([content], { type: 'text/plain' });
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
@@ -564,7 +575,6 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (err) {
             if (err.name !== 'AbortError') {
                 console.error("Save failed:", err);
-                currentFileHandle = null;
             }
         }
     }
@@ -907,7 +917,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function restoreTabCursor() {
         updateLineNumbers(activeTabId);
         let textarea = getActiveCodeArea();
-        if(tabFocus[activeTabId] == true) {
+        if (tabFocus[activeTabId] == true) {
             textarea.setSelectionRange(cursorPositions[activeTabId], cursorPositions[activeTabId]);
             tabFocus[activeTabId] = false;
         }
