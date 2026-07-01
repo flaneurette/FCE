@@ -17,11 +17,11 @@ A minimal html/javascript style code editor, works everywhere, with every langua
 
 ### Features
 
-- Open code files
-- Saving of code files
+- Open files
+- Saving of files
 - Regular string search
 - Regular expression search.
-- Linenumbers
+- Line numbers
 - Settings
 - Preview screen for html/css (play button)
 - Clickable divider to adjust preview.
