@@ -240,7 +240,14 @@ body {
 }
 
 #settings-btn {
-    float:right;
+    padding: 6px 8px;
+    font-family: Arial;
+    font-size: 13px;
+    cursor: pointer;
+    color: #888;
+    background-color: #eee;
+    border: 1px solid #ccc;
+    border-radius: 3px;
 }
 
 </style>
@@ -255,7 +262,7 @@ body {
             <input type="text" id="search-input" placeholder="Search...">
             <button id="search-btn" title="Search (Enter)">Find</button>
             <input type="text" id="regexp-search-input" placeholder="Regex...">
-            <button id="regexp-search-btn" title="Regex Search (Enter)">Regex</button>
+            <button id="regexp-search-btn" title="Regex Search (Enter)">Find</button>
             <span class="search-not-found" id="search-status"></span>
         </div>
         <button id="settings-btn">Settings</button>
@@ -295,7 +302,10 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentSearchIndex = 0;
     let lastSearchTerm = '';
     let cursorPositions = [];
+
     let tabFocus = [];
+
+    document.querySelector('.tab[data-tab-id="tab-1"]').addEventListener('click', () => switchTab('tab-1'));
 
     // Initialize first tab line numbers
     updateLineNumbers(activeTabId);
