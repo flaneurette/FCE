@@ -75,6 +75,7 @@ body {
     border-left: 2px outset #eee;
     border-top: 2px outset #eee;
     border-right: 2px outset #eee;
+    position: relative;
 }
 
 .tab.active {
@@ -82,6 +83,10 @@ body {
     border-left: 2px outset #eee;
     border-top: 2px outset #eee;
     border-right: 2px outset #eee;
+}
+
+.tab:hover {
+    background-color: #e0e0e0;
 }
 
 .editor-container {
@@ -286,6 +291,51 @@ body {
     cursor: col-resize;
 }
 
+.context-menu {
+    display: none;
+    position: absolute;
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+    z-index: 1000;
+    min-width: 120px;
+    font-family: Arial;
+    font-size: 12px;
+}
+
+.context-menu div {
+    padding: 8px 12px;
+    cursor: pointer;
+}
+
+.context-menu div:hover {
+    background-color: #e0e0e0;
+}
+
+.rename-modal input {
+    width: 100%;
+    padding: 8px;
+    margin: 10px 0;
+    font-family: Arial;
+    font-size: 12px;
+    box-sizing: border-box;
+}
+
+.rename-modal button {
+    padding: 8px 15px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: Arial;
+    margin-right: 10px;
+}
+
+.rename-modal button:hover {
+    background-color: #45a049;
+}
+
 </style>
 
 </head>
@@ -294,6 +344,7 @@ body {
         <button id="new-tab-btn" title="New Tab (Ctrl+T)">New Tab</button>
         <button id="open-btn" title="Open File (Ctrl+O)">Open</button>
         <button id="save-btn" title="Save File (Ctrl+S)">Save</button>
+        <button id="rename-btn" title="Rename File">Rename</button>
         <div class="search-container">
             <input type="text" id="search-input" placeholder="Search...">
             <button id="search-btn" title="Search (Enter)">Find</button>
@@ -332,8 +383,26 @@ body {
         </div>
     </div>
 
+    <div id="rename-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Rename File</h2>
+            <div class="rename-modal">
+                <input type="text" id="new-filename" placeholder="Enter new filename (e.g., myfile.html)">
+                <div>
+                    <button id="confirm-rename">Rename</button>
+                    <button id="cancel-rename">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="context-menu" class="context-menu">
+        <div id="rename-tab">Rename</div>
+    </div>
+
 <script>
-    
+
 document.addEventListener('DOMContentLoaded', function() {
 
     const tabBar = document.getElementById('tab-bar');
@@ -343,9 +412,10 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentSearchIndex = 0;
     let lastSearchTerm = '';
     let cursorPositions = [];
-
+    let fileHandles = {}; // Track file handles per tab
     let tabFocus = [];
 
+    // Initialize first tab
     document.querySelector('.tab[data-tab-id="tab-1"]').addEventListener('click', () => switchTab('tab-1'));
 
     // Initialize first tab line numbers
@@ -357,72 +427,60 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('code-1').addEventListener('keyup', handleKey);
     document.getElementById('code-1').addEventListener('input', () => updateLineNumbers('tab-1'));
     document.getElementById('splitter').addEventListener('mousedown', splitterMove);
-    document.getElementById('new-tab-btn').addEventListener('click', createNewTab);
 
-    document.getElementById('open-btn').addEventListener('click', function() {
+    // Menu buttons
+    document.getElementById('new-tab-btn').addEventListener('click', createNewTab);
+    document.getElementById('open-btn').addEventListener('click', openFile);
+    document.getElementById('save-btn').addEventListener('click', doSave);
+    document.getElementById('rename-btn').addEventListener('click', showRenameModal);
+
+    // Rename modal buttons
+    document.getElementById('confirm-rename').addEventListener('click', renameFile);
+    document.getElementById('cancel-rename').addEventListener('click', hideRenameModal);
+
+    // Context menu for tabs
+    document.getElementById('rename-tab').addEventListener('click', showRenameModal);
+
+    // Setup file opening
+    function openFile() {
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = '*';
         input.addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file) return;
+
+            // Create a new tab for the opened file
+            createNewTab(file.name);
+
             const reader = new FileReader();
             reader.onload = function(e) {
                 getActiveCodeArea().value = e.target.result;
                 updateLineNumbers(activeTabId);
                 updateTabName(file.name);
+
+                // Store the file handle if supported
+                if ('showSaveFilePicker' in window) {
+                    fileHandles[activeTabId] = file;
+                }
+
                 let ext = file.name.split('.');
                 assignPreview(ext[1]);
             };
             reader.readAsText(file);
         });
         input.click();
-    });
-
-    document.getElementById('save-btn').addEventListener('click', function(e) {
-        e.preventDefault();
-        doSave();
-    });
-
-
-    let isDragging = false;
-    let windowWidth = 0;
-
-    function splitterDown(e) {
-        isDragging = true;
-        e.preventDefault();
     }
 
-    function splitterMove(e) {
-        if(windowWidth == 0) {
-            windowWidth += window.innerWidth;
-        }
-        windowWidth += 400;
-        document.getElementById('preview-frame').style.width = windowWidth + 'px';
-    }
-
-    function splitterUp() {
-        isDragging = false;
-    }
-
-    // Add event listeners
-    document.getElementById('splitter').addEventListener('mousedown', splitterDown);
-    document.addEventListener('mouseup', splitterUp);
-
+    // Enhanced save function
     async function doSave() {
         const content = getActiveCodeArea().value;
-        let filename = null;
-        let currentFileHandle = null;
-        const filenameInput = document.querySelector(`.tab[data-tab-id="${activeTabId}"]`).textContent;
-        let filename1 = filenameInput.trim();
-        let filename2 = filenameInput.trim();
-        if (!filename1) filename1 = 'untitled.txt';
-        if (!filename1.includes('.')) filename1 += '.txt';
+        let filename = document.querySelector(`.tab[data-tab-id="${activeTabId}"]`).textContent;
+        let currentFileHandle = fileHandles[activeTabId];
 
-        if(filename2) { 
-            filename = filename1;
-            } else {
-            filename = prompt("Save as:", currentFileHandle?.name || filename1) || "untitled.txt";
+        // Ensure filename has extension
+        if (!filename.includes('.')) {
+            filename += '.txt';
         }
 
         try {
@@ -435,7 +493,6 @@ document.addEventListener('DOMContentLoaded', function() {
             // First save or fallback to picker
             else {
                 if ('showSaveFilePicker' in window) {
-
                     currentFileHandle = await window.showSaveFilePicker({
                         suggestedName: filename,
                     });
@@ -443,8 +500,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     const writable = await currentFileHandle.createWritable();
                     await writable.write(content);
                     await writable.close();
+
+                    // Store the file handle
+                    fileHandles[activeTabId] = currentFileHandle;
                 } else {
-                    // Firefox/Safari fallback (still triggers OS dialog, but no extra questions)
+                    // Firefox/Safari fallback
                     const blob = new Blob([content], { type: 'text/plain' });
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
@@ -458,15 +518,69 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             updateTabName(filename);
             let ext = filename.split('.');
-            assignPreview(ext[1]);
+            assignPreview(ext[ext.length - 1]);
         } catch (err) {
             if (err.name !== 'AbortError') {
                 console.error("Save failed:", err);
-                currentFileHandle = null; // Reset if save fails
+                currentFileHandle = null;
             }
         }
     }
 
+    // Rename functionality
+    function showRenameModal() {
+        const currentName = document.querySelector(`.tab[data-tab-id="${activeTabId}"]`).textContent;
+        document.getElementById('new-filename').value = currentName;
+        document.getElementById('rename-modal').style.display = 'block';
+        document.getElementById('new-filename').focus();
+    }
+
+    function hideRenameModal() {
+        document.getElementById('rename-modal').style.display = 'none';
+    }
+
+    function renameFile() {
+        const newName = document.getElementById('new-filename').value.trim();
+        if (!newName) return;
+
+        // Validate filename
+        if (!newName.includes('.')) {
+            alert('Please include a file extension (e.g., .txt, .html)');
+            return;
+        }
+
+        updateTabName(newName);
+        hideRenameModal();
+
+        // Update file handle name if it exists
+        if (fileHandles[activeTabId]) {
+            fileHandles[activeTabId].name = newName;
+        }
+
+        let ext = newName.split('.');
+        assignPreview(ext[ext.length - 1]);
+    }
+
+    // Context menu for tabs
+    document.querySelectorAll('.tab').forEach(tab => {
+        tab.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+            activeTabId = this.dataset.tabId;
+            const contextMenu = document.getElementById('context-menu');
+
+            // Position the context menu near the cursor
+            contextMenu.style.display = 'block';
+            contextMenu.style.left = e.pageX + 'px';
+            contextMenu.style.top = e.pageY + 'px';
+        });
+    });
+
+    // Close context menu when clicking elsewhere
+    document.addEventListener('click', function() {
+        document.getElementById('context-menu').style.display = 'none';
+    });
+
+    // Search functionality
     const searchInput = document.getElementById('search-input');
     const regexpInput = document.getElementById('regexp-search-input');
     const searchStatus = document.getElementById('search-status');
@@ -478,7 +592,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (!term) return;
 
-        // If term changed, reset index
         if (term !== lastSearchTerm) {
             currentSearchIndex = 0;
             lastSearchTerm = term;
@@ -486,7 +599,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
         let index = codeArea.value.indexOf(term, currentSearchIndex);
 
-        // Wrap around
         if (index === -1) {
             index = codeArea.value.indexOf(term, 0);
         }
@@ -494,7 +606,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if (index !== -1) {
             codeArea.focus();
             codeArea.setSelectionRange(index, index + term.length);
-            // Scroll to selection
             const linesBefore = codeArea.value.substring(0, index).split('\n').length;
             codeArea.scrollTop = (linesBefore - 3) * 19.5;
             currentSearchIndex = index + term.length;
@@ -522,12 +633,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const codeArea = getActiveCodeArea();
         updatePreview(codeArea.value);
     }
-    
+
     function updatePreview(code) {
         const previewFrame = document.getElementById('preview-frame');
         previewFrame.srcdoc = `${code}`;
     }
-    
+
     function doRegexSearch() {
         const codeArea = getActiveCodeArea();
         const term = regexpInput.value;
@@ -540,7 +651,6 @@ document.addEventListener('DOMContentLoaded', function() {
             regex.lastIndex = currentSearchIndex;
             let match = regex.exec(codeArea.value);
 
-            // Wrap around
             if (!match) {
                 regex.lastIndex = 0;
                 match = regex.exec(codeArea.value);
@@ -584,7 +694,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Reset search index when search term is cleared
     searchInput.addEventListener('input', function() {
         if (!this.value) {
             currentSearchIndex = 0;
@@ -600,6 +709,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    // Settings modal
     const settingsModal = document.getElementById('settings-modal');
     document.getElementById('settings-btn').addEventListener('click', function() {
         settingsModal.style.display = 'block';
@@ -609,9 +719,9 @@ document.addEventListener('DOMContentLoaded', function() {
         settingsModal.style.display = 'none';
     });
 
-    // Click outside modal to close
     window.addEventListener('click', function(e) {
         if (e.target === settingsModal) settingsModal.style.display = 'none';
+        if (e.target === document.getElementById('rename-modal')) hideRenameModal();
     });
 
     // Font size
@@ -623,6 +733,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
+    // Keyboard shortcuts
     document.addEventListener('keydown', function(e) {
         if (e.ctrlKey) {
             switch(e.key) {
@@ -630,12 +741,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 case 's': e.preventDefault(); doSave(); break;
                 case 'f': e.preventDefault(); searchInput.focus(); searchInput.select(); break;
                 case 't': e.preventDefault(); createNewTab(); break;
+                case 'r': e.preventDefault(); showRenameModal(); break;
             }
         }
     });
 
+    // Tab management
     function createNewTab(name = null) {
-
         tabFocus[activeTabId] = false;
 
         tabCount++;
@@ -671,7 +783,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         switchTab(tabId);
         setTimeout(() => codeArea.focus(), 0);
-        
+
         updateTabName('Blanco.txt');
         tabFocus[tabId] = true;
     }
@@ -726,9 +838,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function restoreTabCursor() {
         updateLineNumbers(activeTabId);
-        // Later, restore the cursor position:
         let textarea = getActiveCodeArea();
-        if(tabFocus[activeTabId] == true) { 
+        if(tabFocus[activeTabId] == true) {
             textarea.setSelectionRange(cursorPositions[activeTabId], cursorPositions[activeTabId]);
             tabFocus[activeTabId] = false;
         }
@@ -737,15 +848,36 @@ document.addEventListener('DOMContentLoaded', function() {
     function storeTabCursor() {
         let textarea = getActiveCodeArea();
         const cursorPos = textarea.selectionStart;
-        const textBeforeCursor = textarea.value.substring(0, cursorPos);
-        const lineNumber = textBeforeCursor.split('\n').length;
-        // Store the character position (not line number) for the active tab
-        cursorPositions[activeTabId] = cursorPos; // Store the actual position
+        cursorPositions[activeTabId] = cursorPos;
     }
 
     function handleKey(e) {
         storeTabCursor();
     }
+
+    // Splitter functionality
+    let isDragging = false;
+    let windowWidth = 0;
+
+    function splitterDown(e) {
+        isDragging = true;
+        e.preventDefault();
+    }
+
+    function splitterMove(e) {
+        if(windowWidth == 0) {
+            windowWidth += window.innerWidth;
+        }
+        windowWidth += 400;
+        document.getElementById('preview-frame').style.width = windowWidth + 'px';
+    }
+
+    function splitterUp() {
+        isDragging = false;
+    }
+
+    document.getElementById('splitter').addEventListener('mousedown', splitterDown);
+    document.addEventListener('mouseup', splitterUp);
 
 });
 </script>
