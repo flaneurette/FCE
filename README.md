@@ -24,7 +24,8 @@ A minimal html/javascript style code editor, works everywhere, with every langua
 - Linenumbers
 - Settings
 - Preview screen for html/css (play button)
+- Clickable divider to adjust preview.
 
-There is no code highlighting, and this is intended. There will be none.
+There is no code highlighting, and this is intended. There will be no such feature.
 
 
